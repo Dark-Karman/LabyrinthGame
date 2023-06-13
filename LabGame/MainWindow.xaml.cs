@@ -12,6 +12,7 @@ using System.Windows.Media;
 using System.Windows.Media.Imaging;
 using System.Windows.Navigation;
 using System.Windows.Shapes;
+using System.Windows.Threading;
 
 namespace LabGame
 {
@@ -23,6 +24,9 @@ namespace LabGame
         public MainWindow()
         {
             InitializeComponent();
+            gameTimer = new DispatcherTimer();
+            gameTimer.Interval = TimeSpan.FromSeconds(1);
+            gameTimer.Tick += GameTimer_Tick;
         }
 
         public class Cell
@@ -32,33 +36,192 @@ namespace LabGame
             public bool IsWall { get; set; }
             public bool IsStart { get; set; }
             public bool IsEnd { get; set; }
+            public bool IsPlayer { get; set; }
         }
 
         public class Maze
         {
             public Cell[,] Cells { get; set; }
+            public Cell Player { get; set; }
+        }
+        private double cellSize = 14;
+        private Maze maze;
+        private bool isPlaying = false;
+        private DispatcherTimer gameTimer;
+        private DateTime startTime;
+
+
+        private void GameTimer_Tick(object sender, EventArgs e)
+        {
+            TimeSpan elapsed = DateTime.Now - startTime;
+            // Обновите текстовое поле с текущим временем игры, например:
+            timerTextBlock.Text = elapsed.ToString(@"mm\:ss");
         }
 
         private void startBtn_Click(object sender, RoutedEventArgs e)
         {
-            int width = int.Parse(widthTb.Text);
-            int height = int.Parse(heightTb.Text);
+            int width;
+            int height;
 
-            Maze maze;
-            if (width <= 101 && height <= 55)
+            bool isWidthValid = int.TryParse(widthTb.Text, out width);
+            bool isHeightValid = int.TryParse(heightTb.Text, out height);
+
+            if (!isWidthValid || !isHeightValid)
+            {
+                MessageBox.Show("Введены некорректные значения. Пожалуйста, введите числовые значения для ширины и высоты.");
+                return;
+            }
+
+            if (width % 2 == 0 || height % 2 == 0)
+            {
+                MessageBox.Show("Введены четные значения. Пожалуйста, введите нечетные значения для ширины и высоты.");
+                return;
+            }
+
+            if (width > 101 || height > 55)
+            {
+                MessageBox.Show("Вы превысили максимальное значение сторон (высота 55 и длина 101).");
+                return;
+            }
+
+            try
             {
                 do
                 {
-                    maze = GenerateMaze(width, height);
-                } while (HasLargeBlackBlock(maze));
-
-                PlayGround gameWindow = new PlayGround();
-                gameWindow.DisplayMaze(maze);
-                gameWindow.Show();
+                    this.maze = GenerateMaze(width, height);
+                } while (HasLargeBlackBlock(this.maze));
             }
-            else MessageBox.Show("Вы привысили максимальное значение сторон (H55 и W101)");
+            catch (Exception ex)
+            {
+                MessageBox.Show($"Произошла ошибка при генерации лабиринта: {ex.Message}");
+                return;
+            }
+
+            for (int x = 0; x < maze.Cells.GetLength(0); x++)
+            {
+                for (int y = 0; y < maze.Cells.GetLength(1); y++)
+                {
+                    if (maze.Cells[x, y].IsStart)
+                    {
+                        maze.Player = maze.Cells[x, y];
+                        maze.Player.IsPlayer = true;
+                        break;
+                    }
+                }
+            }
+
+            StartMenuStackPanel.Visibility = Visibility.Collapsed;
+            mazeCanvas.Visibility = Visibility.Visible;
+            helpBar.Visibility = Visibility.Visible;
+            option.Visibility = Visibility.Visible;
+            if (mouseControl.IsChecked == true)
+            {
+                helpBar.Text = "Чтобы начать игру - переместите курсор в жёлтую клетку";
+                DisplayMaze(this.maze);
+            }
+            else
+            {
+                isPlaying = true;
+                helpBar.Text = "Время уже пошло, для перемещения используйте ←↑↓→";
+                startTime = DateTime.Now;
+                gameTimer.Start();
+                DisplayMaze(this.maze);
+            }
         }
 
+        public void DisplayMaze(Maze maze)
+        {
+            this.maze = maze ?? throw new ArgumentNullException(nameof(maze));
+
+            for (int x = 0; x < maze.Cells.GetLength(0); x++)
+            {
+                for (int y = 0; y < maze.Cells.GetLength(1); y++)
+                {
+                    Cell cell = maze.Cells[x, y];
+
+                    Rectangle rectangle = new Rectangle
+                    {
+                        Width = cellSize,
+                        Height = cellSize,
+                        Fill = cell.IsStart ? Brushes.Yellow :
+                               cell.IsEnd ? Brushes.Green :
+                               cell.IsPlayer ? Brushes.Red :
+                               cell.IsWall ? Brushes.Black : Brushes.White
+                    };
+
+                    Canvas.SetLeft(rectangle, x * cellSize);
+                    Canvas.SetTop(rectangle, y * cellSize);
+
+                    mazeCanvas.Children.Add(rectangle);
+                }
+            }
+        }
+        private void mazeCanvas_MouseMove(object sender, MouseEventArgs e)
+        {
+            if (mouseControl.IsChecked != true)
+            {
+                return;
+            }
+            else
+            {
+                Point mousePosition = e.GetPosition(mazeCanvas);
+                int x = (int)(mousePosition.X / cellSize);
+                int y = (int)(mousePosition.Y / cellSize);
+
+                if (x < 0 || y < 0 || x >= maze.Cells.GetLength(0) || y >= maze.Cells.GetLength(1))
+                {
+                    return;  // The mouse is outside the maze
+                }
+
+                Cell cell = maze.Cells[x, y];
+
+                if (!isPlaying)
+                {
+                    // The game hasn't started yet. Check if the mouse is over the start cell
+                    if (cell.IsStart)
+                    {
+                        isPlaying = true;  // Start the game
+                    }
+                    startTime = DateTime.Now;
+                    gameTimer.Start();
+                }
+                else
+                {
+                    // The game has started. Check if the mouse is over a wall
+                    if (cell.IsWall && !cell.IsStart && !cell.IsEnd)
+                    {
+                        gameTimer.Stop();
+                        timerTextBlock.Text = "";
+                        MessageBox.Show("Игра окончена! Вы врезались в стену!");
+
+                        mazeCanvas.Children.Clear();
+                        mazeCanvas.Visibility = Visibility.Collapsed;
+                        option.Visibility = Visibility.Collapsed;
+                        StartMenuStackPanel.Visibility = Visibility.Visible;
+                        helpBar.Visibility = Visibility.Collapsed;
+                        isPlaying = false;
+
+                    }
+
+                    // Check if the mouse is over the end cell
+                    if (cell.IsEnd)
+                    {
+                        gameTimer.Stop();
+                        TimeSpan finalTime = DateTime.Now - startTime;
+                        timerTextBlock.Text = "";
+                        MessageBox.Show($"Поздравляем! Вы прошли лабиринт за {finalTime.ToString(@"mm\:ss")}");
+
+                        // Clear the canvas and return to the start menu
+                        mazeCanvas.Children.Clear();
+                        mazeCanvas.Visibility = Visibility.Collapsed;
+                        option.Visibility = Visibility.Collapsed;
+                        StartMenuStackPanel.Visibility = Visibility.Visible;
+                        helpBar.Visibility = Visibility.Collapsed;
+                        isPlaying = false;
+                    }
+                }
+            }
+        }
 
         private Maze GenerateMaze(int width, int height)
         {
@@ -108,7 +271,6 @@ namespace LabGame
 
             return maze; // This line should never be reached
         }
-
 
         private void GenerateMazePrim(Maze maze)
         {
@@ -200,65 +362,92 @@ namespace LabGame
                     }
                 }
             }
-
             return false;
+        }
+
+        protected override void OnKeyDown(KeyEventArgs e)
+        {
+            if (keyControl.IsChecked != true)
+            {
+                return;
+            }
+            else
+            {
+                base.OnKeyDown(e);
+
+                if (!isPlaying)
+                {
+                    return;
+                }
+
+                switch (e.Key)
+                {
+                    case Key.Up:
+                        MovePlayer(0, -1);
+                        break;
+
+                    case Key.Down:
+                        MovePlayer(0, 1);
+                        break;
+
+                    case Key.Left:
+                        MovePlayer(-1, 0);
+                        break;
+
+                    case Key.Right:
+                        MovePlayer(1, 0);
+                        break;
+                }
+            }
+        }
+
+        private void MovePlayer(int dx, int dy)
+        {
+            int newX = maze.Player.X + dx;
+            int newY = maze.Player.Y + dy;
+
+            if (newX < 0 || newY < 0 || newX >= maze.Cells.GetLength(0) || newY >= maze.Cells.GetLength(1))
+            {
+                return; // Player tries to move out of the maze
+            }
+
+            if (maze.Cells[newX, newY].IsWall)
+            {
+                return; // Player tries to move into the wall
+            }
+
+            maze.Player.IsPlayer = false; // The old player's cell is no longer a player's cell
+            maze.Player = maze.Cells[newX, newY]; // Move player
+            maze.Player.IsPlayer = true;
+
+            // Check if player has reached the end cell
+            if (maze.Player.IsEnd)
+            {
+                gameTimer.Stop();
+                TimeSpan finalTime = DateTime.Now - startTime;
+                timerTextBlock.Text = "";
+                MessageBox.Show($"Поздравляем! Вы прошли лабиринт за {finalTime.ToString(@"mm\:ss")}");
+
+                mazeCanvas.Children.Clear();
+                mazeCanvas.Visibility = Visibility.Collapsed;
+                StartMenuStackPanel.Visibility = Visibility.Visible;
+                helpBar.Visibility = Visibility.Collapsed;
+                isPlaying = false;
+            }
+
+            DisplayMaze(maze); // Redraw the maze
+        }
+
+
+        private void option_Click(object sender, RoutedEventArgs e)
+        {
+            gameTimer.Stop();
+            timerTextBlock.Text = "";
+            mazeCanvas.Children.Clear();
+            mazeCanvas.Visibility = Visibility.Collapsed;
+            StartMenuStackPanel.Visibility = Visibility.Visible;
+            helpBar.Visibility = Visibility.Collapsed;
+            isPlaying = false;
         }
     }
 }
-
-
-
-//private void DivideMaze(Maze maze, int startX, int startY, int width, int height)
-//{
-//    if (width <= 2 || height <= 2)
-//    {
-//        return;  // The section is too small to divide further
-//    }
-
-//    // Determine where to draw the walls
-//    int horizontalWallX = startX + width / 2;
-//    int verticalWallY = startY + height / 2;
-
-//    // Draw the walls
-//    for (int x = startX; x < startX + width; x++)
-//    {
-//        maze.Cells[x, verticalWallY].IsWall = true;
-//    }
-
-//    for (int y = startY; y < startY + height; y++)
-//    {
-//        maze.Cells[horizontalWallX, y].IsWall = true;
-//    }
-
-//    // Randomly create holes in three of the walls
-//    Random random = new Random();
-//    for (int i = 0; i < 3; i++)
-//    {
-//        int wall = random.Next(4);
-//        switch (wall)
-//        {
-//            case 0:  // Top wall
-//                int holeX = random.Next(horizontalWallX, startX + width);
-//                maze.Cells[holeX, verticalWallY].IsWall = false;
-//                break;
-//            case 1:  // Bottom wall
-//                holeX = random.Next(startX, horizontalWallX);
-//                maze.Cells[holeX, verticalWallY].IsWall = false;
-//                break;
-//            case 2:  // Left wall
-//                int holeY = random.Next(verticalWallY, startY + height);
-//                maze.Cells[horizontalWallX, holeY].IsWall = false;
-//                break;
-//            case 3:  // Right wall
-//                holeY = random.Next(startY, verticalWallY);
-//                maze.Cells[horizontalWallX, holeY].IsWall = false;
-//                break;
-//        }
-//    }
-
-//    // Recursively divide the four sub-sections of the maze
-//    DivideMaze(maze, startX, startY, horizontalWallX - startX, verticalWallY - startY);  // Top left
-//    DivideMaze(maze, horizontalWallX + 1, startY, startX + width - horizontalWallX - 1, verticalWallY - startY);  // Top right
-//    DivideMaze(maze, startX, verticalWallY + 1, horizontalWallX - startX, startY + height - verticalWallY - 1);  // Bottom left
-//    DivideMaze(maze, horizontalWallX + 1, verticalWallY + 1, startX + width - horizontalWallX - 1, startY + height - verticalWallY - 1);  // Bottom right
-//}

@@ -6,29 +6,42 @@
         xmlns:local="clr-namespace:LabGame"
         mc:Ignorable="d"
         Title="MainWindow" Height="450" Width="800" WindowState="Maximized" WindowStartupLocation="CenterScreen">
-    <Grid>
-        <Grid.RowDefinitions>
-            <RowDefinition Height="1*" />
-            <RowDefinition Height="8*" />
-            <RowDefinition Height="1*" />
-        </Grid.RowDefinitions>
-        <Grid.ColumnDefinitions>
-            <ColumnDefinition Width="1*" />
-            <ColumnDefinition Width="16*" />
-            <ColumnDefinition Width="1*" />
-        </Grid.ColumnDefinitions>
+    <ScrollViewer>
+        <Grid Width="auto" Height="auto">
+            <Grid.RowDefinitions>
+                <RowDefinition Height="0.5*" />
+                <RowDefinition Height="12*" />
+                <RowDefinition Height="0.5*" />
+            </Grid.RowDefinitions>
+            <Grid.ColumnDefinitions>
+                <ColumnDefinition Width="1*" />
+                <ColumnDefinition Width="24*" />
+                <ColumnDefinition Width="1*" />
+            </Grid.ColumnDefinitions>
 
-        <StackPanel HorizontalAlignment="Center" VerticalAlignment="Center" Grid.Row="1" Grid.Column="1">
-            <TextBlock Text="Размерность лабиринта" Margin="20" FontSize="16" FontWeight="Bold"/>
-            <GroupBox Header="Высота" Margin="0 10">
-                <TextBox x:Name="heightTb"/>
-            </GroupBox>
+            <TextBlock x:Name="helpBar" VerticalAlignment="Center" Visibility="Collapsed" Grid.Column="1"/>
+            <Button x:Name="option" Visibility="Collapsed" Click="option_Click" VerticalAlignment="Center" Margin="5 0" Grid.Row="2" Content="Назад"/>
+            <TextBlock x:Name="timerTextBlock"  VerticalAlignment="Top" HorizontalAlignment="Left"/>
 
-            <GroupBox Header="Длина" Margin="0 10">
-                <TextBox x:Name="widthTb"/>
-            </GroupBox>
+            <StackPanel x:Name="StartMenuStackPanel" HorizontalAlignment="Center" VerticalAlignment="Center" Grid.Row="1" Grid.Column="1">
+                <TextBlock Text="Размерность лабиринта" Margin="10" FontSize="16" FontWeight="Bold" HorizontalAlignment="Center"/>
+                <GroupBox Header="Высота" Margin="0 10">
+                    <TextBox x:Name="heightTb"/>
+                </GroupBox>
 
-            <Button x:Name="startBtn" Click="startBtn_Click" Content="Начать игру" Margin="0 10"/>
-        </StackPanel>
-    </Grid>
+                <GroupBox Header="Длина" Margin="0 10">
+                    <TextBox x:Name="widthTb"/>
+                </GroupBox>
+
+                <StackPanel Orientation="Horizontal">
+                    <RadioButton x:Name="mouseControl" Content="Управление мышью" Margin="5 0" IsChecked="True"/>
+                    <RadioButton x:Name="keyControl" Content="Управление клавишами" Margin="5 0" />
+                </StackPanel>
+
+                <Button x:Name="startBtn" Click="startBtn_Click" Content="Начать игру" Margin="0 10"/>
+            </StackPanel>
+
+            <Canvas Visibility="Collapsed" MouseMove="mazeCanvas_MouseMove" x:Name="mazeCanvas" Grid.Column="1" Grid.Row="1"/>
+        </Grid>
+    </ScrollViewer>
 </Window>

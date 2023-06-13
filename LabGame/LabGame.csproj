@@ -73,7 +73,6 @@
     </Page>
   </ItemGroup>
   <ItemGroup>
-    <Compile Include="Player.cs" />
     <Compile Include="PlayGround.xaml.cs">
       <DependentUpon>PlayGround.xaml</DependentUpon>
     </Compile>

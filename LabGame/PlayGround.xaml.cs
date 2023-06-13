@@ -48,6 +48,9 @@ namespace LabGame
             }
         }
 
+
+       
+
         private void mazeCanvas_MouseMove(object sender, MouseEventArgs e)
         {
             Point mousePosition = e.GetPosition(mazeCanvas);
